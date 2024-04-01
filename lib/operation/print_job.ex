@@ -6,6 +6,7 @@ defmodule Hippy.Operation.PrintJob do
   @def_charset "utf-8"
   @def_lang "en"
   @def_job_name "Untitled Job"
+  @def_orientation Hippy.Protocol.Orientation.portrait()
 
   @enforce_keys [:printer_uri, :document]
 
@@ -13,7 +14,8 @@ defmodule Hippy.Operation.PrintJob do
             document: nil,
             charset: @def_charset,
             language: @def_lang,
-            job_name: @def_job_name
+            job_name: @def_job_name,
+            orientation: @def_orientation
 
   def new(printer_uri, document, opts \\ []) do
     %__MODULE__{
@@ -21,7 +23,8 @@ defmodule Hippy.Operation.PrintJob do
       document: document,
       job_name: Keyword.get(opts, :job_name, @def_job_name),
       charset: Keyword.get(opts, :charset, @def_charset),
-      language: Keyword.get(opts, :language, @def_lang)
+      language: Keyword.get(opts, :language, @def_lang),
+      orientation: Keyword.get(opts, :orientation, @def_orientation)
     }
   end
 end
@@ -39,6 +42,9 @@ defimpl Hippy.Operation, for: Hippy.Operation.PrintJob do
         {:natural_language, "attributes-natural-language", op.language},
         {:uri, "printer-uri", target},
         {:name_without_language, "job-name", op.job_name}
+      ],
+      job_attributes: [
+        {:enum, "orientation-requested", op.orientation}
       ],
       data: op.document
     }

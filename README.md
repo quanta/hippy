@@ -14,7 +14,7 @@ This is currently very alpha-stage software and will be evolving quickly.  Pleas
 doc = File.read!("tps_report.pdf") 
 printer_uri = "http://localhost:631/printers/HP_Color_LaserJet"
 
-Hippy.Operation.PrintJob.new(printer_uri, doc, job_name: "TPS Report")
+Hippy.Operation.PrintJob.new(printer_uri, doc, job_name: "TPS Report", orientation: Hippy.Protocol.Orientation.portrait())
 |> Hippy.send_operation()
 
 {:ok,

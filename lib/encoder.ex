@@ -8,13 +8,19 @@ defmodule Hippy.Encoder do
 
   @doc "Encodes an IPP request into its binary form."
   def encode(%Request{} = req) do
-    bin =
+    # TODO: Deal with invalid tag error in the middle of the loop.
+    operation_attributes_bin =
       for attribute <- req.operation_attributes, into: request_header(req) do
-        # TODO: Deal with invalid tag error in the middle of loop.
         encode_attribute(attribute)
       end
 
-    <<bin::binary, DelimiterTag.end_of_attributes()::8-signed, req.data :: binary>>
+    job_attributes_bin =
+      for attribute <- req.job_attributes, into: "" do
+        encode_attribute(attribute)
+      end
+
+    <<operation_attributes_bin::binary, job_attributes_bin::binary,
+      DelimiterTag.end_of_attributes()::8-signed, req.data::binary>>
   end
 
   defp encode_attribute({tag, name, value})
