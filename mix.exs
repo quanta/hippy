@@ -5,7 +5,7 @@ defmodule Hippy.MixProject do
     [
       app: :hippy,
       version: "0.4.0-dev",
-      elixir: "~> 1.4",
+      elixir: "~> 1.11",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       description: description(),
@@ -23,7 +23,7 @@ defmodule Hippy.MixProject do
 
   defp deps do
     [
-      {:httpoison, "~> 1.0"},
+      {:httpoison, "~> 2.0"},
       {:ex_doc, "~> 0.19", only: :dev}
     ]
   end

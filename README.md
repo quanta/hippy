@@ -39,6 +39,15 @@ Hippy.Operation.PrintJob.new(printer_uri, doc, job_name: "TPS Report", orientati
    version: %Hippy.IPPVersion{major: 1, minor: 1}
  }}
 ```
+### Force an IPv6 connection
+
+Pass `inet6: true` to force the underlying HTTP connection to use IPv6 when resolving the printer host.
+
+```elixir
+Hippy.Operation.GetPrinterAttributes.new("ipp://[::1]:631/printers/HP_Color_LaserJet")
+|> Hippy.send_operation(inet6: true)
+```
+
 ### Get recently completed jobs
 ```elixir
 Hippy.Operation.GetJobs.new("http://localhost:631/printers/HP_Color_LaserJet")

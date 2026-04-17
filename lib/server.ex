@@ -1,28 +1,43 @@
 defmodule Hippy.Server do
   @supported_schemes ["ipp", "http", "https"]
 
-  def send_operation(op) do
-    if is_nil(op.printer_uri) do
-      {:error, :printer_uri_required}
-    else
-      with {:ok, endpoint} <- format_endpoint(op.printer_uri) do
-        send_operation(op, endpoint)
-      end
-    end
-  end
+  def send_operation(op), do: send_operation(op, [])
 
   def send_operation(_op, nil) do
     {:error, :printer_uri_required}
   end
 
-  def send_operation(op, endpoint) do
-    Hippy.Operation.build_request(op)
-    |> send_request(endpoint)
+  def send_operation(op, endpoint) when is_binary(endpoint) do
+    send_operation(op, endpoint: endpoint)
   end
 
-  def send_request(%Hippy.Request{} = req, endpoint) do
+  def send_operation(op, opts) when is_list(opts) do
+    case Keyword.get(opts, :endpoint) do
+      nil -> resolve_and_send(op, opts)
+      endpoint when is_binary(endpoint) -> dispatch(op, endpoint, opts)
+    end
+  end
+
+  defp resolve_and_send(%{printer_uri: nil}, _opts), do: {:error, :printer_uri_required}
+
+  defp resolve_and_send(op, opts) do
+    with {:ok, endpoint} <- format_endpoint(op.printer_uri) do
+      dispatch(op, endpoint, opts)
+    end
+  end
+
+  defp dispatch(op, endpoint, opts) do
+    op
+    |> Hippy.Operation.build_request()
+    |> send_request(endpoint, opts)
+  end
+
+  def send_request(req, endpoint, opts \\ [])
+
+  def send_request(%Hippy.Request{} = req, endpoint, opts) do
     # TODO: Rework error handling.  It's broken.
-    with {:ok, %{body: body, status_code: 200}} <- post(endpoint, Hippy.Encoder.encode(req)) do
+    with {:ok, %{body: body, status_code: 200}} <-
+           post(endpoint, Hippy.Encoder.encode(req), opts) do
       {:ok, Hippy.Decoder.decode(body)}
     end
   end
@@ -58,8 +73,15 @@ defmodule Hippy.Server do
     {:error, {:unsupported_uri_scheme, scheme}}
   end
 
-  defp post(url, body) do
+  defp post(url, body, opts) do
     headers = ["Content-Type": "application/ipp"]
-    HTTPoison.post(url, body, headers)
+    HTTPoison.post(url, body, headers, http_options(opts))
+  end
+
+  defp http_options(opts) do
+    case Keyword.get(opts, :inet6, false) do
+      true -> [hackney: [:inet6]]
+      false -> []
+    end
   end
 end

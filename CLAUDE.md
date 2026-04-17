@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Hippy is an alpha-stage Elixir client for the Internet Printing Protocol (IPP). It builds IPP requests, encodes them to the IPP binary wire format, posts them over HTTP (typically to CUPS), and decodes the binary response. Elixir requirement: `~> 1.4` (see [mix.exs](mix.exs)). Current version: `0.4.0-dev`.
+Hippy is an alpha-stage Elixir client for the Internet Printing Protocol (IPP). It builds IPP requests, encodes them to the IPP binary wire format, posts them over HTTP (typically to CUPS), and decodes the binary response. Elixir requirement: `~> 1.11` (driven by HTTPoison 2.x; see [mix.exs](mix.exs)). Current version: `0.4.0-dev`.
 
 ## Commands
 
@@ -36,6 +36,15 @@ Key modules:
 - **[`Hippy.AttributeGroup.to_map/1,2`](lib/attribute_group.ex)** — flattens a decoded attribute group into a map keyed by attribute name, dropping `{syntax, name, value}` tuples and recursively compacting `:collection` values. Caveat: called on a list-of-groups (e.g. `GetJobs` `job_attributes`), `to_map/1` returns only the head group — use `to_map(groups, index)` for others. This may change.
 - **[`Hippy.Request`](lib/request.ex) / [`Hippy.Response`](lib/response.ex)** — plain structs. `Response` implements `Access` by delegating to `Map`.
 - **[`Hippy.Server.format_endpoint/1`](lib/server.ex)** — rewrites the URI scheme `ipp` → `http` before the HTTP post; `http`/`https` pass through; anything else returns `{:unsupported_uri_scheme, ...}`. Each operation's `build_request/1` conversely rewrites `http(s)` → `ipp` for the `printer-uri` IPP attribute sent inside the body.
+
+### send_operation options
+
+`Hippy.send_operation/2` accepts a keyword list. A binary second argument is still accepted as a shortcut for `endpoint: binary`.
+
+- `:endpoint` — URL string; overrides the endpoint derived from the operation's `printer_uri`.
+- `:inet6` — boolean; when `true`, passes `hackney: [:inet6]` through to HTTPoison/hackney to force IPv6 resolution for this request.
+
+Other options are currently ignored. The inet6 plumbing lives in `Hippy.Server.http_options/1`; add new transport flags there rather than sprinkling them through the pipeline.
 
 ## Conventions and gotchas
 
