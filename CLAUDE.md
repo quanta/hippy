@@ -2,11 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Hippy is an alpha-stage Elixir client for the Internet Printing Protocol (IPP). It builds IPP requests, encodes them to the IPP binary wire format, posts them over HTTP (typically to CUPS), and decodes the binary response. Elixir requirement: `~> 1.11` (driven by HTTPoison 2.x; see [mix.exs](mix.exs)). Current version: `0.4.0-dev`.
+Hippy is an alpha-stage Elixir client for the Internet Printing Protocol (IPP). It builds IPP requests, encodes them to the IPP binary wire format, posts them over HTTP (typically to CUPS), and decodes the binary response. Elixir requirement: `~> 1.13` (driven by Req `~> 0.5`; see [mix.exs](mix.exs)). Current version: `0.4.0-dev`.
 
 ## Commands
 
-- `mix deps.get` — fetch deps (HTTPoison, ex_doc)
+- `mix deps.get` — fetch deps (Req, ex_doc)
 - `mix compile`
 - `mix test` — run full suite
 - `mix test test/hippy_server_test.exs` — single file
@@ -14,6 +14,7 @@ Hippy is an alpha-stage Elixir client for the Internet Printing Protocol (IPP). 
 - `mix format` / `mix format --check-formatted` — formatter configured via `.formatter.exs`
 - `iex -S mix` — REPL. `.iex.exs` sets `inspect: [limit: :infinity]` so large IPP responses print in full.
 - `mix docs` — generate ExDoc
+- `mix run scripts/smoke.exs attrs <printer-uri> [--inet6]` — real-printer smoke test (GetPrinterAttributes). `print <printer-uri> <file>` subcommand submits an actual PrintJob.
 
 ## Architecture
 
@@ -22,7 +23,7 @@ Entry point `Hippy.send_operation/1,2` in [lib/hippy.ex](lib/hippy.ex) delegates
 ```
 Operation struct → Hippy.Operation.build_request/1 (protocol) → %Hippy.Request{}
                  → Hippy.Encoder.encode/1                     → binary
-                 → HTTPoison.post (Content-Type: application/ipp)
+                 → Req.post (Content-Type: application/ipp)
                  → Hippy.Decoder.decode/1                     → %Hippy.Response{}
 ```
 
@@ -42,9 +43,19 @@ Key modules:
 `Hippy.send_operation/2` accepts a keyword list. A binary second argument is still accepted as a shortcut for `endpoint: binary`.
 
 - `:endpoint` — URL string; overrides the endpoint derived from the operation's `printer_uri`.
-- `:inet6` — boolean; when `true`, passes `hackney: [:inet6]` through to HTTPoison/hackney to force IPv6 resolution for this request.
+- `:inet6` — boolean; when `true`, translates to `connect_options: [transport_opts: [inet6: true]]` on the Req call, forcing IPv6 for this request.
 
 Other options are currently ignored. The inet6 plumbing lives in `Hippy.Server.http_options/1`; add new transport flags there rather than sprinkling them through the pipeline.
+
+### Error contract
+
+`Hippy.send_operation/1,2` returns one of:
+
+- `{:ok, %Hippy.Response{}}` — HTTP 200, IPP body decoded. The IPP-level outcome lives in `response.status_code` (e.g. `:successful_ok`, `:client_error_not_found`).
+- `{:error, :printer_uri_required}` — operation struct has no `printer_uri` and no `:endpoint` was supplied.
+- `{:error, {:unsupported_uri_scheme, scheme}}` — `printer_uri` scheme wasn't `ipp`, `http`, or `https`.
+- `{:error, {:http_status, status, body}}` — printer returned a non-200 HTTP status. `body` is raw IPP bytes; callers may run `Hippy.Decoder.decode/1` on it.
+- `{:error, {:transport, exception}}` — connection/transport error. `exception` is a `%Req.TransportError{}` / `%Mint.TransportError{}`; use `Exception.message/1` for a human-readable summary.
 
 ## Conventions and gotchas
 
@@ -52,5 +63,5 @@ Other options are currently ignored. The inet6 plumbing lives in `Hippy.Server.h
 - Call enum values as zero-arity functions (e.g. `Hippy.Protocol.Operation.print_job()`), not by passing the atom.
 - Binary patterns use `::8-signed`, `::16-signed`, `::32-signed` consistently — match that when adding new value tags.
 - **Adding a new operation:** define a struct + `new/2` in [lib/operation/](lib/operation), add a `defimpl Hippy.Operation` below it returning a `%Hippy.Request{}`. If the operation introduces an enum-valued attribute, also register the attribute name → enum module in `Hippy.Protocol.Enum.get_enum_module/1`.
-- `Hippy.Server.send_request/2` has a known `TODO: Rework error handling.  It's broken.` — non-200 responses and HTTPoison errors currently fall through `with` and return the raw tuple rather than a uniform error shape.
+- `Hippy.Server.send_request/3` returns one of the shapes documented in the Error contract section above. The rewrite to Req also calls Req with `retry: false, redirect: false, decode_body: false` — IPP is a non-idempotent RPC over a custom Content-Type and must not be retried, followed, or content-decoded.
 - 2-space indentation; run `mix format` before committing.
