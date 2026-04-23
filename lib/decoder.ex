@@ -52,6 +52,7 @@ defmodule Hippy.Decoder do
       :job_attributes,
       :operation_attributes,
       :printer_attributes,
+      :unsupported_attributes,
       :unknown_attributes
     ]
 
