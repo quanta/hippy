@@ -1,5 +1,5 @@
 defmodule Hippy.Server do
-  @supported_schemes ["ipp", "http", "https"]
+  @supported_schemes ["ipp", "ipps", "http", "https"]
 
   def send_operation(op), do: send_operation(op, [])
 
@@ -69,6 +69,11 @@ defmodule Hippy.Server do
     %{uri | scheme: "http"}
   end
 
+  defp adjust_scheme(%URI{scheme: "ipps"} = uri) do
+    # IPP-over-TLS: translate to https for the underlying transport.
+    %{uri | scheme: "https"}
+  end
+
   defp adjust_scheme(%URI{scheme: scheme} = uri) when scheme in ["http", "https"] do
     # Leave as is.
     uri
@@ -91,12 +96,23 @@ defmodule Hippy.Server do
     )
   end
 
-  # Transport options. `:inet6` threads through to Finch/Mint; if Req's default
+  # Transport options. These thread through Req → Finch → Mint; if Req's default
   # adapter ever changes, revisit this mapping.
+  #
+  # `:inet6` — force IPv6 resolution.
+  # `:insecure` — skip TLS certificate verification. Printers commonly present
+  #   self-signed certs; opt in per-request rather than weakening the default.
   defp http_options(opts) do
-    case Keyword.get(opts, :inet6, false) do
-      true -> [connect_options: [transport_opts: [inet6: true]]]
-      false -> []
+    transport =
+      [
+        if(Keyword.get(opts, :inet6, false), do: {:inet6, true}),
+        if(Keyword.get(opts, :insecure, false), do: {:verify, :verify_none})
+      ]
+      |> Enum.reject(&is_nil/1)
+
+    case transport do
+      [] -> []
+      tops -> [connect_options: [transport_opts: tops]]
     end
   end
 end

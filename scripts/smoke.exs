@@ -3,14 +3,18 @@
 # Usage:
 #   mix run scripts/smoke.exs attrs ipp://printer.local:631/ipp/print
 #   mix run scripts/smoke.exs attrs 'ipp://[fd00::1]:631/ipp/print' --inet6
+#   mix run scripts/smoke.exs attrs ipps://printer.local:631/ipp/print --insecure
 #   mix run scripts/smoke.exs print ipp://printer.local:631/ipp/print sample.pdf
 #   mix run scripts/smoke.exs print ipp://printer.local:631/ipp/print hi.txt --job-name "smoke test"
+#
+# Flags: --inet6 forces IPv6. --insecure skips TLS cert verification
+# (printers usually present self-signed certs).
 #
 # Exit codes: 0 ok, 1 operation failed, 2 usage error.
 
 defmodule Smoke do
   def opts(flags) do
-    if Keyword.get(flags, :inet6, false), do: [inet6: true], else: []
+    Keyword.take(flags, [:inet6, :insecure])
   end
 
   def report({:ok, %Hippy.Response{status_code: status} = resp}, printer) do
@@ -46,7 +50,9 @@ defmodule Smoke do
 end
 
 {flags, positional, _} =
-  OptionParser.parse(System.argv(), switches: [inet6: :boolean, job_name: :string])
+  OptionParser.parse(System.argv(),
+    switches: [inet6: :boolean, insecure: :boolean, job_name: :string]
+  )
 
 case positional do
   ["attrs", uri] ->
@@ -92,8 +98,8 @@ case positional do
   _ ->
     IO.puts(:stderr, """
     usage:
-      mix run scripts/smoke.exs attrs <printer-uri> [--inet6]
-      mix run scripts/smoke.exs print <printer-uri> <file> [--inet6] [--job-name NAME]
+      mix run scripts/smoke.exs attrs <printer-uri> [--inet6] [--insecure]
+      mix run scripts/smoke.exs print <printer-uri> <file> [--inet6] [--insecure] [--job-name NAME]
     """)
 
     System.halt(2)

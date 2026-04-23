@@ -26,7 +26,7 @@ end
 
 defimpl Hippy.Operation, for: Hippy.Operation.CancelJob do
   def build_request(op) do
-    target = String.replace(op.printer_uri, ~r/^http(s)?/, "ipp")
+    target = String.replace(op.printer_uri, ~r/^http(s?)/, "ipp\\1")
 
     %Hippy.Request{
       request_id: System.unique_integer([:positive, :monotonic]),
