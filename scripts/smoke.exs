@@ -1,11 +1,17 @@
 # Smoke test harness for Hippy against a real IPP printer.
 #
 # Usage:
+#   mix run scripts/smoke.exs list ipp://localhost:631/
 #   mix run scripts/smoke.exs attrs ipp://printer.local:631/ipp/print
 #   mix run scripts/smoke.exs attrs 'ipp://[fd00::1]:631/ipp/print' --inet6
 #   mix run scripts/smoke.exs attrs ipps://printer.local:631/ipp/print --insecure
 #   mix run scripts/smoke.exs print ipp://printer.local:631/ipp/print sample.pdf
 #   mix run scripts/smoke.exs print ipp://printer.local:631/ipp/print hi.txt --job-name "smoke test"
+#
+# Subcommands:
+#   list  — CUPS-Get-Printers against a server URI; prints printer names.
+#   attrs — GetPrinterAttributes against a specific printer URI.
+#   print — submit a PrintJob with a file as the document.
 #
 # Flags: --inet6 forces IPv6. --insecure skips TLS cert verification
 # (printers usually present self-signed certs).
@@ -55,6 +61,21 @@ end
   )
 
 case positional do
+  ["list", uri] ->
+    uri
+    |> Hippy.Operation.CupsGetPrinters.new(requested_attributes: ["printer-name"])
+    |> Hippy.send_operation(Smoke.opts(flags))
+    |> Smoke.report(fn %Hippy.Response{printer_attributes: attrs} ->
+      names =
+        attrs
+        |> Hippy.AttributeGroup.to_map()
+        |> Map.get("printer-name", [])
+        |> List.wrap()
+
+      IO.puts("found #{length(names)} printer(s):")
+      Enum.each(names, fn name -> IO.puts("  #{name}") end)
+    end)
+
   ["attrs", uri] ->
     uri
     |> Hippy.Operation.GetPrinterAttributes.new()
@@ -98,6 +119,7 @@ case positional do
   _ ->
     IO.puts(:stderr, """
     usage:
+      mix run scripts/smoke.exs list  <server-uri>  [--inet6] [--insecure]
       mix run scripts/smoke.exs attrs <printer-uri> [--inet6] [--insecure]
       mix run scripts/smoke.exs print <printer-uri> <file> [--inet6] [--insecure] [--job-name NAME]
     """)
