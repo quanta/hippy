@@ -28,7 +28,7 @@ end
 
 defimpl Hippy.Operation, for: Hippy.Operation.GetJobAttributes do
   def build_request(op) do
-    target = String.replace(op.printer_uri, ~r/^http(s)?/, "ipp")
+    target = String.replace(op.printer_uri, ~r/^http(s?)/, "ipp\\1")
 
     %Hippy.Request{
       # Should request_id be a parameter to build_request?

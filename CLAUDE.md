@@ -36,7 +36,7 @@ Key modules:
 - **[`Hippy.Protocol.Enum`](lib/protocol/enum.ex)** — `__using__` macro that turns a map like `%{print_job: 0x0002, ...}` into a module exposing a zero-arity function per key (e.g. `print_job/0`) plus `encode/1`, `encode!/1`, `decode/1`, `decode!/1`. Used by every enum in [lib/protocol/](lib/protocol). The `get_enum_module/1` map in this file wires IPP attribute names (e.g. `"orientation-requested"`) to their enum module so the decoder can auto-translate values.
 - **[`Hippy.AttributeGroup.to_map/1,2`](lib/attribute_group.ex)** — flattens a decoded attribute group into a map keyed by attribute name, dropping `{syntax, name, value}` tuples and recursively compacting `:collection` values. Caveat: called on a list-of-groups (e.g. `GetJobs` `job_attributes`), `to_map/1` returns only the head group — use `to_map(groups, index)` for others. This may change.
 - **[`Hippy.Request`](lib/request.ex) / [`Hippy.Response`](lib/response.ex)** — plain structs. `Response` implements `Access` by delegating to `Map`.
-- **[`Hippy.Server.format_endpoint/1`](lib/server.ex)** — rewrites the URI scheme `ipp` → `http` before the HTTP post; `http`/`https` pass through; anything else returns `{:unsupported_uri_scheme, ...}`. Each operation's `build_request/1` conversely rewrites `http(s)` → `ipp` for the `printer-uri` IPP attribute sent inside the body.
+- **[`Hippy.Server.format_endpoint/1`](lib/server.ex)** — rewrites URI schemes for the HTTP transport: `ipp` → `http`, `ipps` → `https`; `http`/`https` pass through; anything else returns `{:unsupported_uri_scheme, ...}`. Each operation's `build_request/1` conversely rewrites `http` → `ipp` and `https` → `ipps` for the `printer-uri` IPP attribute sent inside the body (the regex uses a backreference to preserve the `s`).
 
 ### send_operation options
 
@@ -44,8 +44,9 @@ Key modules:
 
 - `:endpoint` — URL string; overrides the endpoint derived from the operation's `printer_uri`.
 - `:inet6` — boolean; when `true`, translates to `connect_options: [transport_opts: [inet6: true]]` on the Req call, forcing IPv6 for this request.
+- `:insecure` — boolean; when `true`, adds `verify: :verify_none` to `transport_opts`, skipping TLS certificate verification. Printers commonly present self-signed certs; opt in per-request rather than weakening the default.
 
-Other options are currently ignored. The inet6 plumbing lives in `Hippy.Server.http_options/1`; add new transport flags there rather than sprinkling them through the pipeline.
+Other options are currently ignored. The transport plumbing lives in `Hippy.Server.http_options/1`; add new transport flags there rather than sprinkling them through the pipeline.
 
 ### Error contract
 
