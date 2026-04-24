@@ -96,16 +96,25 @@ defmodule Hippy.Server do
     )
   end
 
+  @doc false
   # Transport options. These thread through Req → Finch → Mint; if Req's default
   # adapter ever changes, revisit this mapping.
   #
-  # `:inet6` — force IPv6 resolution.
+  # `:inet6` — force IPv6 for the TCP connect.
+  # `:inet4` — when explicitly `false`, disables Mint's family fallback
+  #   (`Mint.Core.Transport.TCP` retries without `:inet6` if the first attempt
+  #   fails). Disabling the fallback surfaces the real error instead of masking
+  #   it as `:nxdomain` when the fallback attempts to DNS-resolve an IPv6
+  #   literal string. When the caller does not set `:inet4`, the key is omitted
+  #   entirely so Mint keeps its default (`inet4: true`) — preserving the
+  #   pre-existing IPv4 / hostname path.
   # `:insecure` — skip TLS certificate verification. Printers commonly present
   #   self-signed certs; opt in per-request rather than weakening the default.
-  defp http_options(opts) do
+  def http_options(opts) do
     transport =
       [
         if(Keyword.get(opts, :inet6, false), do: {:inet6, true}),
+        if(Keyword.has_key?(opts, :inet4), do: {:inet4, Keyword.fetch!(opts, :inet4)}),
         if(Keyword.get(opts, :insecure, false), do: {:verify, :verify_none})
       ]
       |> Enum.reject(&is_nil/1)
